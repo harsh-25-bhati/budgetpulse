@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Budget & Monthly Expense Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-wallet text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            BudgetPulse
+            <span class="text-[10px] font-semibold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full">v1.0</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Monthly Expense & Budget Monitor</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <!-- Month Picker -->
+        <input type="month" id="selectedMonth" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs sm:text-sm rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+        
+        <!-- Add Expense Button -->
+        <button onclick="openModal('expenseModal')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs sm:text-sm px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-lg shadow-indigo-600/25 transition active:scale-95">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Add Expense</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Top Alert / Status Banner -->
+    <div id="statusBanner" class="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between flex-wrap gap-4 transition-all">
+      <div class="flex items-center space-x-3">
+        <div id="statusIcon" class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-shield-check"></i>
+        </div>
+        <div>
+          <h4 id="statusTitle" class="text-sm font-bold text-white">Budget in Healthy Zone</h4>
+          <p id="statusDesc" class="text-xs text-slate-400">You are pacing well below your targeted burn rate for this month.</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="openModal('budgetModal')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/60 text-slate-200 transition">
+          <i class="fa-solid fa-sliders mr-1 text-slate-400"></i> Set Budgets
+        </button>
+        <button onclick="exportData()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/60 text-slate-200 transition">
+          <i class="fa-solid fa-file-csv mr-1 text-slate-400"></i> Export CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total Budget Card -->
+      <div class="bg-slate-800/60 border border-slate-700/50 p-5 rounded-2xl relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Total Monthly Budget</span>
+          <i class="fa-solid fa-sack-dollar text-slate-500"></i>
+        </div>
+        <div class="text-2xl font-extrabold text-white tracking-tight" id="kpiBudget">₹0</div>
+        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+          <span class="text-indigo-400 font-semibold" id="kpiDaysLeft">-- days</span> remaining in month
+        </p>
+      </div>
+
+      <!-- Total Spent Card -->
+      <div class="bg-slate-800/60 border border-slate-700/50 p-5 rounded-2xl relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Total Spent</span>
+          <i class="fa-solid fa-receipt text-slate-500"></i>
+        </div>
+        <div class="text-2xl font-extrabold text-rose-400 tracking-tight" id="kpiSpent">₹0</div>
+        <div class="w-full bg-slate-700/50 rounded-full h-1.5 mt-3 overflow-hidden">
+          <div id="kpiProgressBar" class="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Remaining Balance Card -->
+      <div class="bg-slate-800/60 border border-slate-700/50 p-5 rounded-2xl relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Remaining Balance</span>
+          <i class="fa-solid fa-piggy-bank text-slate-500"></i>
+        </div>
+        <div class="text-2xl font-extrabold text-emerald-400 tracking-tight" id="kpiRemaining">₹0</div>
+        <p class="text-xs text-slate-400 mt-2" id="kpiSpentPercent">0% utilized</p>
+      </div>
+
+      <!-- Safe Daily Allowance -->
+      <div class="bg-slate-800/60 border border-slate-700/50 p-5 rounded-2xl relative overflow-hidden">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-medium uppercase tracking-wider">Safe Daily Allowance</span>
+          <i class="fa-solid fa-gauge-high text-slate-500"></i>
+        </div>
+        <div class="text-2xl font-extrabold text-amber-400 tracking-tight" id="kpiDailySafe">₹0</div>
+        <p class="text-xs text-slate-400 mt-2">Spend up to this/day to stay on budget</p>
+      </div>
+    </div>
+
+    <!-- Charts & Category Budgets Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Category Budget Progress Bars (2 cols on large screen) -->
+      <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-700/50 pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Category Budgets & Progress</h3>
+            <p class="text-xs text-slate-400">Track individual limits and alerts</p>
+          </div>
+          <button onclick="openModal('budgetModal')" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Edit Limits &rarr;</button>
+        </div>
+
+        <div id="categoryBarsContainer" class="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+
+      <!-- Spending Breakdown Chart -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5 flex flex-col justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider border-b border-slate-700/50 pb-3">Expense Breakdown</h3>
+          <div class="relative flex items-center justify-center my-4 h-56">
+            <canvas id="expenseChart"></canvas>
+            <div id="chartEmpty" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 text-xs">
+              <i class="fa-regular fa-chart-pie text-3xl mb-2 text-slate-600"></i>
+              No expenses recorded yet
+            </div>
+          </div>
+        </div>
+        <div id="topCategorySummary" class="text-xs text-slate-400 border-t border-slate-700/50 pt-3 flex justify-between">
+          <span>Highest Expense:</span>
+          <span class="font-semibold text-slate-200" id="highestExpenseLabel">None</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Expenses Table & Controls -->
+    <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/50 pb-3">
+        <div>
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider">Transaction History</h3>
+          <p class="text-xs text-slate-400">All recorded payments for this month</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <!-- Search Box -->
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+            <input type="text" id="searchInput" oninput="renderTransactions()" placeholder="Search items..." class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg pl-8 pr-3 py-1.5 focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+          </div>
+          <!-- Filter by Category -->
+          <select id="filterCategory" onchange="renderTransactions()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+            <option value="ALL">All Categories</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="text-slate-400 border-b border-slate-700/40 uppercase font-semibold">
+              <th class="py-2.5 px-3">Date</th>
+              <th class="py-2.5 px-3">Description</th>
+              <th class="py-2.5 px-3">Category</th>
+              <th class="py-2.5 px-3">Payment Mode</th>
+              <th class="py-2.5 px-3 text-right">Amount</th>
+              <th class="py-2.5 px-3 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="transactionTableBody" class="divide-y divide-slate-800">
+            <!-- Injected via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="noTransactions" class="hidden text-center py-10">
+        <i class="fa-solid fa-receipt text-3xl text-slate-600 mb-2"></i>
+        <p class="text-slate-400 text-sm">No expenses recorded for this month.</p>
+        <button onclick="openModal('expenseModal')" class="mt-3 text-xs bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg hover:bg-indigo-600/30 transition">Add First Expense</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add Expense Modal -->
+  <div id="expenseModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-850 bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+      <button onclick="closeModal('expenseModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <h3 class="text-base font-bold text-white mb-1">Add New Expense</h3>
+      <p class="text-xs text-slate-400 mb-4">Record your spending to keep your budget accurate.</p>
+
+      <form id="expenseForm" onsubmit="handleSaveExpense(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Description</label>
+          <input type="text" id="expDesc" required placeholder="e.g., Grocery store, Cafe, Uber" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Amount (₹)</label>
+            <input type="number" id="expAmount" min="0.01" step="any" required placeholder="0.00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+            <input type="date" id="expDate" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Category</label>
+            <select id="expCategory" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <!-- Injected dynamically -->
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Payment Mode</label>
+            <select id="expPayment" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="UPI">UPI / GPay / PhonePe</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Cash">Cash</option>
+              <option value="Net Banking">Net Banking</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end space-x-2">
+          <button type="button" onclick="closeModal('expenseModal')" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Budget Settings Modal -->
+  <div id="budgetModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
+      <button onclick="closeModal('budgetModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <h3 class="text-base font-bold text-white mb-1">Set Category Budgets</h3>
+      <p class="text-xs text-slate-400 mb-4">Assign maximum spending thresholds for the active month.</p>
+
+      <div class="flex-1 overflow-y-auto space-y-3 pr-2" id="budgetInputsContainer">
+        <!-- Injected via JS -->
+      </div>
+
+      <div class="pt-4 border-t border-slate-800 flex justify-between items-center mt-3">
+        <div class="text-xs text-slate-400">Total Budget: <span id="modalTotalBudgetSum" class="font-bold text-emerald-400">₹0</span></div>
+        <div class="flex space-x-2">
+          <button type="button" onclick="closeModal('budgetModal')" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">Cancel</button>
+          <button type="button" onclick="saveCategoryBudgets()" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition">Save Budgets</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+    BudgetPulse &bull; Stored locally in your browser &bull; Works offline
+  </footer>
+
+  <script>
+    // Default initial categories
+    const DEFAULT_CATEGORIES = [
+      { id: 'cat_food', name: 'Food & Dining', icon: 'fa-utensils', color: '#10b981', defaultBudget: 6000 },
+      { id: 'cat_rent', name: 'Rent & Accommodation', icon: 'fa-house', color: '#6366f1', defaultBudget: 12000 },
+      { id: 'cat_transport', name: 'Transport & Fuel', icon: 'fa-motorcycle', color: '#f59e0b', defaultBudget: 2500 },
+      { id: 'cat_gadgets', name: 'Electronics & Tech', icon: 'fa-laptop-code', color: '#06b6d4', defaultBudget: 3000 },
+      { id: 'cat_entertainment', name: 'Entertainment & Hobbies', icon: 'fa-film', color: '#ec4899', defaultBudget: 2000 },
+      { id: 'cat_groceries', name: 'Groceries & Essentials', icon: 'fa-basket-shopping', color: '#8b5cf6', defaultBudget: 4000 },
+      { id: 'cat_misc', name: 'Miscellaneous', icon: 'fa-ellipsis', color: '#64748b', defaultBudget: 1500 }
+    ];
+
+    let state = {
+      selectedMonth: new Date().toISOString().slice(0, 7), // YYYY-MM
+      categories: [],
+      budgets: {}, // { '2026-11': { cat_food: 6000, ... } }
+      expenses: []  // [ { id, desc, amount, date, categoryId, paymentMode } ]
+    };
+
+    let chartInstance = null;
+
+    // LocalStorage keys
+    const STORAGE_KEY = 'budgetpulse_data_v1';
+
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          state.categories = parsed.categories || DEFAULT_CATEGORIES;
+          state.budgets = parsed.budgets || {};
+          state.expenses = parsed.expenses || [];
+        } catch (e) {
+          state.categories = DEFAULT_CATEGORIES;
+        }
+      } else {
+        state.categories = DEFAULT_CATEGORIES;
+        // Seed default demo budget for current month
+        state.budgets[state.selectedMonth] = {};
+        DEFAULT_CATEGORIES.forEach(c => {
+          state.budgets[state.selectedMonth][c.id] = c.defaultBudget;
+        });
+      }
+
+      // If active month budget isn't setup, initialize from defaults
+      if (!state.budgets[state.selectedMonth]) {
+        state.budgets[state.selectedMonth] = {};
+        state.categories.forEach(c => {
+          state.budgets[state.selectedMonth][c.id] = c.defaultBudget;
+        });
+      }
+    }
+
+    function persistData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    // Initialize App
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      
+      const monthInput = document.getElementById('selectedMonth');
+      monthInput.value = state.selectedMonth;
+      monthInput.addEventListener('change', (e) => {
+        state.selectedMonth = e.target.value;
+        if (!state.budgets[state.selectedMonth]) {
+          state.budgets[state.selectedMonth] = {};
+          state.categories.forEach(c => {
+            state.budgets[state.selectedMonth][c.id] = c.defaultBudget;
+          });
+          persistData();
+        }
+        refreshDashboard();
+      });
+
+      // Default modal date to today
+      document.getElementById('expDate').value = new Date().toISOString().slice(0, 10);
+
+      initCategoryDropdowns();
+      refreshDashboard();
+    });
+
+    function initCategoryDropdowns() {
+      const expCatSelect = document.getElementById('expCategory');
+      const filterCatSelect = document.getElementById('filterCategory');
+
+      expCatSelect.innerHTML = '';
+      filterCatSelect.innerHTML = '<option value="ALL">All Categories</option>';
+
+      state.categories.forEach(c => {
+        expCatSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        filterCatSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+      });
+    }
+
+    function refreshDashboard() {
+      const monthExpenses = getActiveMonthExpenses();
+      const currentBudgets = state.budgets[state.selectedMonth] || {};
+
+      // Compute Total Budget
+      let totalBudget = 0;
+      state.categories.forEach(c => {
+        totalBudget += Number(currentBudgets[c.id] || 0);
+      });
+
+      // Compute Total Spent
+      let totalSpent = monthExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
+      let remaining = totalBudget - totalSpent;
+      let spentPercent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+      // Update KPIs
+      document.getElementById('kpiBudget').textContent = '₹' + totalBudget.toLocaleString('en-IN');
+      document.getElementById('kpiSpent').textContent = '₹' + Math.round(totalSpent).toLocaleString('en-IN');
+      document.getElementById('kpiRemaining').textContent = '₹' + Math.round(remaining).toLocaleString('en-IN');
+      document.getElementById('kpiSpentPercent').textContent = `${spentPercent.toFixed(1)}% utilized`;
+      
+      const progressBar = document.getElementById('kpiProgressBar');
+      progressBar.style.width = `${Math.min(spentPercent, 100)}%`;
+      if (spentPercent > 100) {
+        progressBar.className = 'bg-rose-500 h-1.5 rounded-full transition-all duration-500';
+      } else if (spentPercent > 85) {
+        progressBar.className = 'bg-amber-500 h-1.5 rounded-full transition-all duration-500';
+      } else {
+        progressBar.className = 'bg-indigo-500 h-1.5 rounded-full transition-all duration-500';
+      }
+
+      // Days Calculation
+      const [year, month] = state.selectedMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const today = new Date();
+      let daysRemaining = daysInMonth;
+
+      if (today.getFullYear() === year && (today.getMonth() + 1) === month) {
+        daysRemaining = Math.max(1, daysInMonth - today.getDate() + 1);
+      }
+      document.getElementById('kpiDaysLeft').textContent = `${daysRemaining} days`;
+
+      // Safe Daily Allowance
+      let safeDaily = remaining > 0 ? remaining / daysRemaining : 0;
+      document.getElementById('kpiDailySafe').textContent = '₹' + Math.round(safeDaily).toLocaleString('en-IN');
+
+      // Update Status Alert Banner
+      updateStatusBanner(spentPercent, remaining, daysRemaining);
+
+      // Render Categories Progress
+      renderCategoryBars(monthExpenses, currentBudgets);
+
+      // Render Transactions
+      renderTransactions();
+
+      // Render Donut Chart
+      renderChart(monthExpenses);
+    }
+
+    function updateStatusBanner(percent, remaining, daysRemaining) {
+      const banner = document.getElementById('statusBanner');
+      const icon = document.getElementById('statusIcon');
+      const title = document.getElementById('statusTitle');
+      const desc = document.getElementById('statusDesc');
+
+      if (remaining < 0) {
+        banner.className = 'p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 flex items-center justify-between flex-wrap gap-4 transition-all';
+        icon.className = 'w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center text-lg';
+        icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+        title.textContent = 'Monthly Budget Exceeded!';
+        desc.textContent = `You have surpassed your budget limit by ₹${Math.abs(Math.round(remaining)).toLocaleString('en-IN')}.`;
+      } else if (percent > 85) {
+        banner.className = 'p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex items-center justify-between flex-wrap gap-4 transition-all';
+        icon.className = 'w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg';
+        icon.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>';
+        title.textContent = 'High Burn Rate Warning';
+        desc.textContent = `You have used ${percent.toFixed(1)}% of your budget with ${daysRemaining} days left.`;
+      } else {
+        banner.className = 'p-4 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between flex-wrap gap-4 transition-all';
+        icon.className = 'w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg';
+        icon.innerHTML = '<i class="fa-solid fa-shield-check"></i>';
+        title.textContent = 'Budget in Healthy Zone';
+        desc.textContent = `You are pacing well below your targeted burn rate for this month.`;
+      }
+    }
+
+    function renderCategoryBars(monthExpenses, currentBudgets) {
+      const container = document.getElementById('categoryBarsContainer');
+      container.innerHTML = '';
+
+      state.categories.forEach(cat => {
+        const spent = monthExpenses
+          .filter(e => e.categoryId === cat.id)
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        
+        const limit = Number(currentBudgets[cat.id] || 0);
+        const percent = limit > 0 ? (spent / limit) * 100 : 0;
+
+        let barColor = 'bg-emerald-500';
+        let badgeColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+
+        if (percent > 100) {
+          barColor = 'bg-rose-500';
+          badgeColor = 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+        } else if (percent > 80) {
+          barColor = 'bg-amber-500';
+          badgeColor = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+        }
+
+        container.innerHTML += `
+          <div class="bg-slate-900/60 border border-slate-800 p-3.5 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2.5">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style="background-color: ${cat.color}20; color: ${cat.color}">
+                  <i class="fa-solid ${cat.icon}"></i>
+                </div>
+                <span class="text-xs font-semibold text-slate-200">${cat.name}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-bold text-white">₹${Math.round(spent).toLocaleString('en-IN')}</span>
+                <span class="text-[11px] text-slate-500"> / ₹${limit.toLocaleString('en-IN')}</span>
+                <span class="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded border ${badgeColor}">${percent.toFixed(0)}%</span>
+              </div>
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div class="${barColor} h-1.5 rounded-full transition-all duration-300" style="width: ${Math.min(percent, 100)}%"></div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function renderTransactions() {
+      const tbody = document.getElementById('transactionTableBody');
+      const emptyDiv = document.getElementById('noTransactions');
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const filterCat = document.getElementById('filterCategory').value;
+
+      let list = getActiveMonthExpenses();
+
+      if (filterCat !== 'ALL') {
+        list = list.filter(e => e.categoryId === filterCat);
+      }
+      if (search.trim()) {
+        list = list.filter(e => e.desc.toLowerCase().includes(search));
+      }
+
+      // Sort newest date first
+      list.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      if (list.length === 0) {
+        tbody.innerHTML = '';
+        emptyDiv.classList.remove('hidden');
+        return;
+      }
+
+      emptyDiv.classList.add('hidden');
+      tbody.innerHTML = list.map(item => {
+        const cat = state.categories.find(c => c.id === item.categoryId) || { name: 'Other', icon: 'fa-tag', color: '#64748b' };
+        return `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="py-3 px-3 text-slate-400">${item.date}</td>
+            <td class="py-3 px-3 font-medium text-slate-200">${item.desc}</td>
+            <td class="py-3 px-3">
+              <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md" style="background-color: ${cat.color}20; color: ${cat.color}">
+                <i class="fa-solid ${cat.icon} text-[10px]"></i> ${cat.name}
+              </span>
+            </td>
+            <td class="py-3 px-3 text-slate-400">${item.paymentMode || 'UPI'}</td>
+            <td class="py-3 px-3 text-right font-bold text-slate-100">₹${Number(item.amount).toLocaleString('en-IN')}</td>
+            <td class="py-3 px-3 text-center">
+              <button onclick="deleteExpense('${item.id}')" class="text-slate-500 hover:text-rose-400 p-1 transition" title="Delete">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderChart(monthExpenses) {
+      const canvas = document.getElementById('expenseChart');
+      const emptyMsg = document.getElementById('chartEmpty');
+      const highestLabel = document.getElementById('highestExpenseLabel');
+
+      const catTotals = {};
+      monthExpenses.forEach(e => {
+        catTotals[e.categoryId] = (catTotals[e.categoryId] || 0) + Number(e.amount);
+      });
+
+      const activeCategories = state.categories.filter(c => (catTotals[c.id] || 0) > 0);
+
+      if (activeCategories.length === 0) {
+        canvas.style.display = 'none';
+        emptyMsg.style.display = 'flex';
+        highestLabel.textContent = 'None';
+        if (chartInstance) chartInstance.destroy();
+        return;
+      }
+
+      canvas.style.display = 'block';
+      emptyMsg.style.display = 'none';
+
+      // Find highest category
+      let highestCat = activeCategories.reduce((max, c) => (catTotals[c.id] > (catTotals[max.id] || 0) ? c : max), activeCategories[0]);
+      highestLabel.textContent = `${highestCat.name} (₹${Math.round(catTotals[highestCat.id]).toLocaleString('en-IN')})`;
+
+      const labels = activeCategories.map(c => c.name);
+      const data = activeCategories.map(c => catTotals[c.id]);
+      const bgColors = activeCategories.map(c => c.color);
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: bgColors,
+            borderWidth: 2,
+            borderColor: '#0f172a'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  return ' ' + ctx.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN');
+                }
+              }
+            }
+          },
+          cutout: '72%'
+        }
+      });
+    }
+
+    function getActiveMonthExpenses() {
+      return state.expenses.filter(e => e.date && e.date.startsWith(state.selectedMonth));
+    }
+
+    function handleSaveExpense(e) {
+      e.preventDefault();
+      const desc = document.getElementById('expDesc').value.trim();
+      const amount = parseFloat(document.getElementById('expAmount').value);
+      const date = document.getElementById('expDate').value;
+      const categoryId = document.getElementById('expCategory').value;
+      const paymentMode = document.getElementById('expPayment').value;
+
+      if (!desc || isNaN(amount) || amount <= 0 || !date) return;
+
+      const newExpense = {
+        id: 'exp_' + Date.now(),
+        desc,
+        amount,
+        date,
+        categoryId,
+        paymentMode
+      };
+
+      state.expenses.push(newExpense);
+      persistData();
+
+      // Reset form & close
+      e.target.reset();
+      document.getElementById('expDate').value = new Date().toISOString().slice(0, 10);
+      closeModal('expenseModal');
+      refreshDashboard();
+    }
+
+    function deleteExpense(id) {
+      if (!confirm('Are you sure you want to delete this expense entry?')) return;
+      state.expenses = state.expenses.filter(e => e.id !== id);
+      persistData();
+      refreshDashboard();
+    }
+
+    // Modal helpers
+    function openModal(id) {
+      if (id === 'budgetModal') {
+        buildBudgetModalInputs();
+      }
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function buildBudgetModalInputs() {
+      const container = document.getElementById('budgetInputsContainer');
+      const currentBudgets = state.budgets[state.selectedMonth] || {};
+      container.innerHTML = '';
+
+      state.categories.forEach(cat => {
+        const val = currentBudgets[cat.id] !== undefined ? currentBudgets[cat.id] : cat.defaultBudget;
+        container.innerHTML += `
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style="background-color: ${cat.color}20; color: ${cat.color}">
+                <i class="fa-solid ${cat.icon}"></i>
+              </div>
+              <span class="text-xs font-medium text-slate-200">${cat.name}</span>
+            </div>
+            <div class="flex items-center space-x-1">
+              <span class="text-xs text-slate-400">₹</span>
+              <input type="number" id="budget_input_${cat.id}" value="${val}" min="0" oninput="recalcModalTotal()" class="w-28 bg-slate-900 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1.5 text-right focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+            </div>
+          </div>
+        `;
+      });
+      recalcModalTotal();
+    }
+
+    function recalcModalTotal() {
+      let sum = 0;
+      state.categories.forEach(cat => {
+        const el = document.getElementById(`budget_input_${cat.id}`);
+        if (el) sum += Number(el.value || 0);
+      });
+      document.getElementById('modalTotalBudgetSum').textContent = '₹' + sum.toLocaleString('en-IN');
+    }
+
+    function saveCategoryBudgets() {
+      if (!state.budgets[state.selectedMonth]) {
+        state.budgets[state.selectedMonth] = {};
+      }
+      state.categories.forEach(cat => {
+        const el = document.getElementById(`budget_input_${cat.id}`);
+        if (el) {
+          state.budgets[state.selectedMonth][cat.id] = Math.max(0, parseFloat(el.value) || 0);
+        }
+      });
+      persistData();
+      closeModal('budgetModal');
+      refreshDashboard();
+    }
+
+    function exportData() {
+      const expenses = getActiveMonthExpenses();
+      if (expenses.length === 0) {
+        alert('No expenses to export for the selected month.');
+        return;
+      }
+
+      let csv = 'Date,Description,Category,Payment Mode,Amount (INR)
+';
+      expenses.forEach(e => {
+        const cat = state.categories.find(c => c.id === e.categoryId)?.name || 'Other';
+        csv += `"${e.date}","${e.desc.replace(/"/g, '""')}","${cat}","${e.paymentMode || 'UPI'}",${e.amount}
+`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `BudgetPulse_${state.selectedMonth}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
