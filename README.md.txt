@@ -1,2 +1,2 @@
-KPI tracking, category limits, CSV export
+KPI tracking
 file:///C:/Users/Admin/.copilot/Downloads/BudgetPulse.html
